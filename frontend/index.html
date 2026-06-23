@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>StrokeAI v3 — Neural Stroke Detection</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#060d18;--surf:#0d1525;--bdr:rgba(255,255,255,.07);--bdr2:rgba(255,255,255,.14);
+  --acc:#22d3ee;--acc2:#7c3aed;--red:#ef4444;--green:#10b981;--amber:#f59e0b;
+  --txt:#e2e8f0;--muted:#64748b;--r:12px;--r2:18px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:'DM Sans',system-ui,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;min-height:100vh}
+button{font-family:inherit;cursor:pointer}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#1e293b;border-radius:2px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* Nav */
+nav{position:sticky;top:0;z-index:100;border-bottom:1px solid var(--bdr);background:rgba(6,13,24,.92);backdrop-filter:blur(16px);padding:11px 22px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:9px}
+.logo-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#22d3ee,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:15px}
+.logo-text{font-family:'Syne',serif;font-weight:800;font-size:1.05rem;color:#fff}
+.logo-tag{font-size:.58rem;font-family:monospace;color:var(--muted);background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px}
+.nav-pills{display:flex;align-items:center;gap:8px}
+.pill{font-size:.6rem;font-weight:600;padding:3px 8px;border-radius:99px}
+.pill-ok{background:rgba(16,185,129,.1);color:#34d399;border:1px solid rgba(16,185,129,.2)}
+.pill-err{background:rgba(239,68,68,.1);color:#f87171;border:1px solid rgba(239,68,68,.2)}
+.pill-warn{background:rgba(245,158,11,.1);color:#fbbf24;border:1px solid rgba(245,158,11,.2)}
+
+/* Main */
+main{max-width:940px;margin:0 auto;padding:40px 18px 80px;display:flex;flex-direction:column;gap:26px}
+
+/* Hero */
+.hero{text-align:center}
+.hero h1{font-family:'Syne',serif;font-weight:800;font-size:clamp(1.9rem,5vw,3.1rem);letter-spacing:-.03em;line-height:1.05;background:linear-gradient(135deg,#67e8f9,#818cf8,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:13px}
+.hero p{color:var(--muted);font-size:.88rem;max-width:500px;margin:0 auto 6px;line-height:1.7}
+.hero small{color:#334155;font-size:.65rem;font-family:monospace}
+.acc{color:var(--acc)}
+
+/* Card */
+.card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r2);padding:22px}
+
+/* Upload */
+#dz{border:2px dashed var(--bdr2);border-radius:var(--r2);padding:44px 20px;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:rgba(255,255,255,.01)}
+#dz:hover,#dz.over{border-color:var(--acc);background:rgba(34,211,238,.04)}
+.dz-icon{width:50px;height:50px;margin:0 auto 13px;border-radius:13px;background:linear-gradient(135deg,rgba(34,211,238,.15),rgba(124,58,237,.15));display:flex;align-items:center;justify-content:center;font-size:20px}
+.dz-title{font-size:.92rem;font-weight:600;color:#fff;margin-bottom:5px}
+.dz-sub{font-size:.76rem;color:var(--muted)}
+.dz-sub span{color:var(--acc);font-weight:500}
+#cpill{display:none;position:absolute;top:10px;right:12px;font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--acc2);color:#fff}
+#thumbs{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px}
+.thumb{position:relative;width:72px;height:72px;border-radius:9px;overflow:hidden;border:1px solid var(--bdr2);background:#000;flex-shrink:0}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb-del{position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,.75);border:none;color:#fff;font-size:.5rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.thumb-del:hover{background:#ef4444}
+.thumb-name{position:absolute;bottom:0;left:0;right:0;font-size:.5rem;color:#ccc;background:rgba(0,0,0,.72);padding:2px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Buttons */
+.btn-primary{padding:12px 26px;border:none;border-radius:var(--r);background:linear-gradient(135deg,#22d3ee,#7c3aed);color:#fff;font-weight:600;font-size:.9rem;transition:all .2s;box-shadow:0 0 20px rgba(34,211,238,.2)}
+.btn-primary:hover:not(:disabled){transform:scale(1.02);box-shadow:0 0 32px rgba(34,211,238,.35)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-ghost{padding:10px 16px;border:1px solid var(--bdr2);border-radius:var(--r);background:transparent;color:var(--muted);font-size:.83rem;transition:.15s}
+.btn-ghost:hover{color:var(--txt);border-color:rgba(255,255,255,.3)}
+#action-row{display:flex;gap:9px;margin-top:13px}
+
+/* Loading */
+#loading{display:none;flex-direction:column;align-items:center;gap:12px;padding:26px}
+.spinner{width:40px;height:40px;border-radius:50%;border:3px solid rgba(255,255,255,.07);border-top-color:var(--acc);animation:spin .75s linear infinite}
+.step{display:flex;align-items:center;gap:7px;font-size:.73rem;color:var(--muted);opacity:.32;transition:all .3s}
+.step::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.step.active{opacity:1;color:var(--acc)}
+.step.done{opacity:.6;color:var(--green)}
+
+/* Error */
+#err{display:none;background:rgba(127,29,29,.3);border:1px solid rgba(239,68,68,.3);border-radius:var(--r);padding:12px 16px;color:#fca5a5;font-size:.82rem;margin-top:12px}
+
+/* Results */
+#results{display:none;flex-direction:column;gap:20px}
+
+/* Verdict */
+.verdict{border-radius:var(--r2);padding:20px 24px}
+.verdict-s{background:linear-gradient(135deg,rgba(127,29,29,.5),rgba(69,10,10,.4));border:1px solid rgba(239,68,68,.35)}
+.verdict-n{background:linear-gradient(135deg,rgba(6,46,38,.6),rgba(4,30,25,.5));border:1px solid rgba(16,185,129,.25)}
+.verdict-lbl{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:7px}
+.verdict-title{font-family:'Syne',serif;font-weight:800;font-size:1.85rem;margin-bottom:4px}
+.verdict-sub{font-size:.8rem;color:var(--muted)}
+
+/* Confidence */
+.conf-wrap{margin-top:15px}
+.conf-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.conf-lbl{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.conf-val{font-family:monospace;font-size:.86rem;font-weight:600}
+.conf-track{height:6px;background:rgba(255,255,255,.06);border-radius:99px;overflow:hidden}
+.conf-fill{height:100%;border-radius:99px;transition:width 1.2s cubic-bezier(.4,0,.2,1);width:0}
+.fill-s{background:linear-gradient(90deg,#f97316,#ef4444)}
+.fill-n{background:linear-gradient(90deg,#10b981,#34d399)}
+
+/* Claude */
+.claude-box{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r2);padding:18px 22px}
+.claude-hdr{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+.claude-icon{width:27px;height:27px;border-radius:7px;background:linear-gradient(135deg,rgba(34,211,238,.2),rgba(124,58,237,.2));display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.claude-lbl{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--acc)}
+.claude-txt{font-size:.84rem;color:var(--txt);line-height:1.78;white-space:pre-line}
+
+/* Scan grid */
+#scan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,390px),1fr));gap:13px}
+.scan-card{border-radius:var(--r2);padding:15px;display:flex;flex-direction:column;gap:11px;animation:fadeUp .4s ease}
+.scan-s{background:rgba(127,29,29,.2);border:1px solid rgba(239,68,68,.28)}
+.scan-n{background:rgba(6,46,38,.2);border:1px solid rgba(16,185,129,.2)}
+.scan-hdr{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.scan-num{font-size:.6rem;font-weight:700;padding:2px 7px;border-radius:99px;background:rgba(255,255,255,.07);color:var(--muted)}
+.scan-name{font-size:.7rem;color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pred-badge{font-size:.7rem;font-weight:600;padding:2px 9px;border-radius:99px}
+.badge-s{background:rgba(239,68,68,.15);color:#fca5a5;border:1px solid rgba(239,68,68,.2)}
+.badge-n{background:rgba(16,185,129,.12);color:#6ee7b7;border:1px solid rgba(16,185,129,.2)}
+.xai-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.xai-pane{display:flex;flex-direction:column;gap:5px}
+.xai-wrap{position:relative}
+.xai-img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;border:1px solid var(--bdr);background:#000;display:block}
+.xai-img-s{border-color:rgba(239,68,68,.35)!important}
+.roi-badge{position:absolute;bottom:5px;left:5px;display:flex;align-items:center;gap:4px;background:rgba(0,0,0,.77);padding:2px 7px;border-radius:99px}
+.roi-dot{width:5px;height:5px;border-radius:50%;background:#ef4444;animation:pulse 2s infinite}
+.roi-txt{font-size:.54rem;color:#fff;font-weight:600}
+.xai-cap-row{display:flex;align-items:center;justify-content:space-between}
+.xai-cap{font-size:.57rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.xai-tog{font-size:.57rem;padding:2px 8px;border:1px solid var(--bdr2);border-radius:99px;background:transparent;color:var(--muted);cursor:pointer}
+.xai-tog:hover{color:var(--txt)}
+.no-hm{aspect-ratio:1;border-radius:8px;border:1px dashed var(--bdr);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--muted);font-size:.7rem;text-align:center;padding:8px}
+.xai-legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.legend-bar{width:66px;height:5px;border-radius:99px;background:linear-gradient(90deg,#0000ff,#00ff00,#ffff00,#ff0000);flex-shrink:0}
+.legend-lbls{display:flex;gap:8px}
+.legend-lbl{font-size:.57rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+
+/* Chart */
+.chart-box{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r2);padding:17px 22px}
+.sec-title{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:12px}
+#chart-area{display:flex;align-items:flex-end;gap:8px;height:110px}
+#chart-lbls{display:flex;gap:8px;margin-top:5px}
+.chart-legend{display:flex;gap:14px;justify-content:center;margin-top:8px}
+.chart-legend-item{display:flex;align-items:center;gap:4px;font-size:.6rem;color:var(--muted)}
+.chart-legend-dot{width:8px;height:8px;border-radius:2px}
+
+/* How it works */
+.how-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:10px}
+.how-card{background:rgba(255,255,255,.02);border:1px solid var(--bdr);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:7px}
+.how-icon{font-size:1.3rem}
+.how-title{font-size:.8rem;font-weight:600;color:#fff}
+.how-desc{font-size:.7rem;color:var(--muted);line-height:1.6}
+
+/* Footer */
+footer{text-align:center;padding:20px;border-top:1px solid var(--bdr);font-size:.65rem;color:#1e293b;margin-top:10px}
+
+.hidden{display:none!important}
+.fade-up{animation:fadeUp .4s ease}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="logo">
+    <div class="logo-icon">🧠</div>
+    <span class="logo-text">StrokeAI</span>
+    <span class="logo-tag">v3 · TFLite 128×128</span>
+  </div>
+  <div class="nav-pills">
+    <span class="pill pill-warn" id="model-pill">Checking...</span>
+    <span class="pill pill-warn" id="backend-pill">Connecting...</span>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main>
+
+  <div class="hero" id="hero">
+    <h1>Neural Stroke Detection</h1>
+    <p>Upload 1–10 brain CT or MRI scans for real-time AI analysis with
+       <span class="acc">Grad-CAM XAI heatmaps</span> and clinical explanation.</p>
+    <small>Backend: http://localhost:8000 · Model: TFLite Xception 128×128 · Output: binary sigmoid</small>
+  </div>
+
+  <!-- Upload -->
+  <div class="card">
+    <div id="dz"
+      ondragover="event.preventDefault();this.classList.add('over')"
+      ondragleave="this.classList.remove('over')"
+      ondrop="handleDrop(event)"
+      onclick="document.getElementById('fi').click()">
+      <input type="file" id="fi" multiple accept="image/*" style="display:none" onchange="addFiles(this.files);this.value=''">
+      <div class="dz-icon">🧠</div>
+      <p class="dz-title">Drop brain scans here</p>
+      <p class="dz-sub">or <span>click to browse</span> · JPEG/PNG/WEBP · up to 10 scans</p>
+      <span id="cpill"></span>
+    </div>
+    <div id="thumbs"></div>
+    <div id="err"></div>
+    <div id="action-row" style="display:none">
+      <button class="btn-primary" id="anlbtn" onclick="runAnalysis()">Analyse Scans</button>
+      <button class="btn-ghost" onclick="resetAll()">Clear all</button>
+    </div>
+    <div id="loading">
+      <div class="spinner"></div>
+      <div style="display:flex;flex-direction:column;gap:4px;width:100%;max-width:340px">
+        <div class="step" id="s1">Validating images...</div>
+        <div class="step" id="s2">Running TFLite inference (128×128)...</div>
+        <div class="step" id="s3">Generating XAI heatmaps...</div>
+        <div class="step" id="s4">Getting Claude AI explanation...</div>
+        <div class="step" id="s5">Aggregating results...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+    <div id="vbanner" class="verdict fade-up"></div>
+    <div class="chart-box fade-up hidden" id="chart-box">
+      <p class="sec-title">Per-Scan Confidence</p>
+      <div id="chart-area"></div>
+      <div id="chart-lbls"></div>
+      <div class="chart-legend">
+        <div class="chart-legend-item"><span class="chart-legend-dot" style="background:#ef4444"></span>Stroke</div>
+        <div class="chart-legend-item"><span class="chart-legend-dot" style="background:#10b981"></span>Normal</div>
+      </div>
+    </div>
+    <div class="claude-box fade-up">
+      <div class="claude-hdr">
+        <div class="claude-icon">🤖</div>
+        <span class="claude-lbl">Claude AI — Clinical Explanation</span>
+      </div>
+      <div class="claude-txt" id="claude-txt"></div>
+    </div>
+    <div class="fade-up">
+      <p class="sec-title" id="cards-title"></p>
+      <div id="scan-grid"></div>
+    </div>
+    <button class="btn-ghost fade-up" onclick="resetAll()" style="margin-top:4px">↩ New Analysis</button>
+  </div>
+
+  <!-- How it works -->
+  <div class="how-grid" id="how">
+    <div class="how-card"><div class="how-icon">📤</div><p class="how-title">Upload Scans</p><p class="how-desc">Drop 1–10 brain CT/MRI images. JPEG, PNG, WEBP supported.</p></div>
+    <div class="how-card"><div class="how-icon">🔬</div><p class="how-title">Real AI Model</p><p class="how-desc">Your trained TFLite Xception (128×128) runs on the local backend.</p></div>
+    <div class="how-card"><div class="how-icon">🗺️</div><p class="how-title">XAI Heatmap</p><p class="how-desc">Occlusion sensitivity maps the stroke ROI in red/orange.</p></div>
+    <div class="how-card"><div class="how-icon">📋</div><p class="how-title">PDF Report</p><p class="how-desc">Download a clinical report with all results and explanation.</p></div>
+  </div>
+
+</main>
+
+<footer>StrokeAI v3 · TFLite Xception 128×128 · Research only · Not for clinical use</footer>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────
+const API = "";
+let files = [], urlCache = new Map(), hmStates = {};
+
+// ── Health check ──────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const res = await fetch(`${API}/health`);
+    const d   = await res.json();
+    const bp  = document.getElementById('backend-pill');
+    const mp  = document.getElementById('model-pill');
+    bp.textContent = '● Backend Online';
+    bp.className   = 'pill pill-ok';
+    mp.textContent = d.model_loaded ? '🧠 Model Loaded' : '⚠️ Demo Mode';
+    mp.className   = d.model_loaded ? 'pill pill-ok' : 'pill pill-warn';
+  } catch {
+    const bp = document.getElementById('backend-pill');
+    bp.textContent = '● Backend Offline';
+    bp.className   = 'pill pill-err';
+    document.getElementById('model-pill').textContent = '—';
+    document.getElementById('model-pill').className   = 'pill pill-err';
+  }
+}
+checkHealth();
+setInterval(checkHealth, 10000);
+
+// ── File handling ─────────────────────────────────────────────────────
+function handleDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('over');
+  addFiles(e.dataTransfer.files);
+}
+function addFiles(fl) {
+  const ok = ['image/jpeg','image/png','image/webp','image/bmp','image/gif'];
+  for (const f of Array.from(fl)) {
+    if (!ok.includes(f.type)) { showErr(`"${f.name}" — unsupported format.`); return; }
+    if (f.size > 15*1024*1024) { showErr(`"${f.name}" exceeds 15MB.`); return; }
+  }
+  const merged = [...files, ...Array.from(fl)].reduce((a,f)=>a.find(x=>x.name===f.name)?a:[...a,f],[]);
+  if (merged.length > 10) { showErr('Maximum 10 images.'); return; }
+  clearErr(); files = merged; renderThumbs();
+}
+function getUrl(f) {
+  if (!urlCache.has(f.name)) urlCache.set(f.name, URL.createObjectURL(f));
+  return urlCache.get(f.name);
+}
+function rmFile(name) {
+  const u = urlCache.get(name); if(u){URL.revokeObjectURL(u);urlCache.delete(name);}
+  files = files.filter(f=>f.name!==name); renderThumbs(); clearErr();
+}
+function renderThumbs() {
+  const t=document.getElementById('thumbs'), p=document.getElementById('cpill');
+  const a=document.getElementById('action-row'), btn=document.getElementById('anlbtn');
+  if (!files.length) {
+    t.innerHTML='';t.style.display='none';p.style.display='none';a.style.display='none';return;
+  }
+  p.textContent=`${files.length} scan${files.length>1?'s':''} ready`;p.style.display='inline';
+  btn.textContent=`Analyse ${files.length} Scan${files.length>1?'s':''}`;
+  a.style.display='flex'; t.style.display='flex';
+  t.innerHTML = files.map(f=>`
+    <div class="thumb">
+      <img src="${getUrl(f)}" loading="lazy">
+      <button class="thumb-del" onclick="rmFile('${f.name}')">✕</button>
+      <span class="thumb-name">${f.name}</span>
+    </div>`).join('');
+}
+function showErr(m){const e=document.getElementById('err');e.textContent='⚠️ '+m;e.style.display='block';}
+function clearErr(){const e=document.getElementById('err');if(e)e.style.display='none';}
+
+// ── Analysis ──────────────────────────────────────────────────────────
+async function runAnalysis() {
+  if (!files.length) return;
+  document.getElementById('action-row').style.display='none';
+  document.getElementById('loading').style.display='flex';
+  document.getElementById('results').style.display='none';
+  document.getElementById('how').classList.add('hidden');
+  document.getElementById('hero').style.display='none';
+  clearErr();
+
+  const steps=['s1','s2','s3','s4','s5'];
+  const activate=(i)=>steps.forEach((s,j)=>{
+    document.getElementById(s).className='step'+(j<i?' done':j===i?' active':'');
+  });
+
+  try {
+    // Build form data
+    activate(0); await sleep(300);
+    const fd = new FormData();
+    files.forEach(f=>fd.append('files',f));
+
+    activate(1);
+    const res = await fetch(`${API}/predict`,{method:'POST',body:fd});
+
+    activate(2); await sleep(200);
+    activate(3); await sleep(200);
+    activate(4); await sleep(200);
+
+    if (!res.ok) {
+      const err = await res.json().catch(()=>({detail:`Server error ${res.status}`}));
+      throw new Error(err.detail || `Server error ${res.status}`);
+    }
+
+    const data = await res.json();
+    document.getElementById('loading').style.display='none';
+    document.getElementById('action-row').style.display='flex';
+    renderResults(data);
+
+  } catch(e) {
+    document.getElementById('loading').style.display='none';
+    document.getElementById('action-row').style.display='flex';
+    document.getElementById('hero').style.display='block';
+    document.getElementById('how').classList.remove('hidden');
+    showErr(`Error: ${e.message}. Is the backend running at http://localhost:8000?`);
+  }
+}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ── Render results ────────────────────────────────────────────────────
+function renderResults(data) {
+  const {prediction, confidence, individual_results, explanation, xai_images} = data;
+  const isS = prediction==='Stroke', pct=Math.round(confidence*100), n=individual_results.length;
+  const sc  = individual_results.filter(r=>r.prediction==='Stroke').length;
+
+  // Verdict
+  const vb=document.getElementById('vbanner');
+  vb.className=`verdict fade-up ${isS?'verdict-s':'verdict-n'}`;
+  vb.innerHTML=`
+    <div class="verdict-lbl">${n>1?`Aggregated · ${n} scans · majority vote`:'Result'}</div>
+    <div class="verdict-title" style="color:${isS?'#fca5a5':'#6ee7b7'}">${isS?'⚠️ Stroke Detected':'✅ Normal'}</div>
+    ${n>1?`<p class="verdict-sub">${sc}/${n} scans flagged Stroke · ${n-sc} Normal</p>`:''}
+    <div class="conf-wrap">
+      <div class="conf-hdr">
+        <span class="conf-lbl">Aggregate Confidence</span>
+        <span class="conf-val" style="color:${isS?'#fca5a5':'#6ee7b7'}">${pct}%</span>
+      </div>
+      <div class="conf-track"><div class="conf-fill ${isS?'fill-s':'fill-n'}" id="agg-bar"></div></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn-ghost" onclick="downloadPDF()" style="font-size:.78rem">⬇ PDF Report</button>
+      <button class="btn-ghost" onclick="resetAll()" style="font-size:.78rem">↩ New Analysis</button>
+    </div>`;
+  setTimeout(()=>{const b=document.getElementById('agg-bar');if(b)b.style.width=pct+'%';},120);
+
+  // Chart
+  const cbox=document.getElementById('chart-box');
+  if(n>1){cbox.classList.remove('hidden');renderChart(individual_results);}
+  else cbox.classList.add('hidden');
+
+  // Claude
+  document.getElementById('claude-txt').textContent=explanation;
+
+  // Cards
+  document.getElementById('cards-title').textContent=n>1?`Individual Results (${n})`:'Scan Analysis';
+  hmStates={};
+  const grid=document.getElementById('scan-grid'); grid.innerHTML='';
+
+  // Build XAI index — heatmaps come in order of stroke scans
+  let xaiIdx=0;
+  individual_results.forEach((r,i)=>{
+    const isRS=r.prediction==='Stroke', cpct=Math.round(r.confidence*100);
+    // Use heatmap from individual result first, then from xai_images array
+    const hm64 = r.heatmap || (isRS && xai_images[xaiIdx] ? xai_images[xaiIdx++] : null);
+    if(isRS) xaiIdx; // already incremented if used
+    hmStates[i]=true;
+    const file=files.find(f=>f.name===r.filename)||files[i];
+    const origUrl=file?getUrl(file):'';
+    const hmUrl=hm64?`data:image/png;base64,${hm64}`:'';
+
+    const card=document.createElement('div');
+    card.className=`scan-card ${isRS?'scan-s':'scan-n'}`;
+    card.innerHTML=`
+      <div class="scan-hdr">
+        <span class="scan-num">#${i+1}</span>
+        <span class="scan-name">${r.filename}</span>
+        <span class="pred-badge ${isRS?'badge-s':'badge-n'}">${isRS?'⚠️ Stroke':'✅ Normal'}</span>
+      </div>
+      <div class="xai-grid">
+        <div class="xai-pane">
+          <div class="xai-wrap">
+            ${origUrl?`<img class="xai-img" src="${origUrl}" loading="lazy">`:'<div class="no-hm">No preview</div>'}
+          </div>
+          <div class="xai-cap-row"><span class="xai-cap">Original</span></div>
+        </div>
+        <div class="xai-pane">
+          ${isRS && hmUrl ? `
+          <div class="xai-wrap">
+            <img class="xai-img xai-img-s" id="hm-img-${i}" src="${hmUrl}" loading="lazy">
+            <div class="roi-badge" id="roi-${i}"><span class="roi-dot"></span><span class="roi-txt">ROI</span></div>
+          </div>
+          <div class="xai-cap-row">
+            <span class="xai-cap">XAI Heatmap</span>
+            <button class="xai-tog" id="tog-${i}" onclick="toggleHM(${i},'${origUrl}','${hmUrl}')">Hide</button>
+          </div>
+          ` : `
+          <div class="no-hm"><span style="font-size:1.3rem">${isRS?'⏳':'✅'}</span><p>${isRS?'No heatmap':'Normal scan'}</p></div>
+          <div class="xai-cap-row"><span class="xai-cap">${isRS?'No Heatmap':'No XAI'}</span></div>
+          `}
+        </div>
+        ${isRS && hmUrl ? `
+        <div class="xai-legend" style="grid-column:1/-1">
+          <div class="legend-bar"></div>
+          <div class="legend-lbls">
+            <span class="legend-lbl" style="color:#6699ff">Low</span>
+            <span class="legend-lbl" style="color:#00cc66">Med</span>
+            <span class="legend-lbl" style="color:#ff4400">High (ROI)</span>
+          </div>
+        </div>` : ''}
+      </div>
+      <div class="conf-wrap" style="margin-top:0">
+        <div class="conf-hdr">
+          <span class="conf-lbl">Confidence</span>
+          <span class="conf-val" style="color:${isRS?'#fca5a5':'#6ee7b7'}">${cpct}%</span>
+        </div>
+        <div class="conf-track"><div class="conf-fill ${isRS?'fill-s':'fill-n'}" id="bar-${i}" style="width:0"></div></div>
+      </div>`;
+    grid.appendChild(card);
+  });
+
+  document.getElementById('results').style.display='flex';
+  document.getElementById('results').style.flexDirection='column';
+  document.getElementById('results').style.gap='20px';
+
+  requestAnimationFrame(()=>{
+    individual_results.forEach((_,i)=>{
+      setTimeout(()=>{
+        const b=document.getElementById(`bar-${i}`);
+        if(b)b.style.width=Math.round(individual_results[i].confidence*100)+'%';
+      },150+i*75);
+    });
+  });
+}
+
+function toggleHM(idx, origUrl, hmUrl) {
+  hmStates[idx]=!hmStates[idx];
+  const show=hmStates[idx];
+  const img=document.getElementById(`hm-img-${idx}`);
+  const tog=document.getElementById(`tog-${idx}`);
+  const roi=document.getElementById(`roi-${idx}`);
+  if(img) img.src=show?hmUrl:origUrl;
+  if(tog) tog.textContent=show?'Hide':'Show';
+  if(roi) roi.style.display=show?'flex':'none';
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────
+function renderChart(results) {
+  const area=document.getElementById('chart-area'), lbls=document.getElementById('chart-lbls');
+  area.innerHTML=''; lbls.innerHTML='';
+  results.forEach((r,i)=>{
+    const pct=Math.round(r.confidence*100), isS=r.prediction==='Stroke';
+    const col=document.createElement('div');
+    col.style.cssText='flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;height:100%';
+    col.innerHTML=`<span style="font-size:.58rem;font-family:monospace;color:${isS?'#fca5a5':'#6ee7b7'};font-weight:600">${pct}%</span>
+      <div style="width:100%;border-radius:4px 4px 0 0;background:${isS?'rgba(239,68,68,.75)':'rgba(16,185,129,.75)'};height:0;transition:height .9s cubic-bezier(.4,0,.2,1)" data-h="${(pct/100)*95}px"></div>`;
+    area.appendChild(col);
+    const lbl=document.createElement('div');
+    lbl.style.cssText='flex:1;text-align:center;font-size:.58rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    lbl.textContent=files[i]?.name.length>12?`Scan ${i+1}`:files[i]?.name||`Scan ${i+1}`;
+    lbls.appendChild(lbl);
+  });
+  setTimeout(()=>area.querySelectorAll('[data-h]').forEach(b=>b.style.height=b.dataset.h),160);
+}
+
+// ── PDF ───────────────────────────────────────────────────────────────
+function downloadPDF() {
+  const vt=document.getElementById('vbanner')?.querySelector('.verdict-title')?.textContent||'';
+  const isS=vt.includes('Stroke');
+  const expl=document.getElementById('claude-txt')?.textContent||'';
+  const date=new Date().toLocaleString();
+  const cards=[...document.querySelectorAll('#scan-grid .scan-card')];
+  const rows=files.map((f,i)=>{
+    const bar=document.getElementById(`bar-${i}`);
+    const conf=bar?parseFloat(bar.style.width||'75'):75;
+    const isRS=cards[i]?.classList.contains('scan-s');
+    return`<tr><td>${i+1}</td><td>${f.name}</td><td style="color:${isRS?'#dc2626':'#059669'};font-weight:600">${isRS?'Stroke':'Normal'}</td><td>${Math.round(conf)}%</td></tr>`;
+  }).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>StrokeAI Report</title>
+  <style>body{font-family:'Segoe UI',Arial,sans-serif;color:#111;padding:40px;max-width:720px;margin:0 auto}
+  h1{font-size:22px;color:#0e7490}.sub{font-size:12px;color:#888;margin-bottom:22px}
+  .v{font-size:20px;font-weight:700;color:${isS?'#dc2626':'#059669'};margin:14px 0 6px}
+  h2{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#0e7490;margin:20px 0 9px;border-top:1px solid #e5e7eb;padding-top:13px}
+  table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;padding:8px 12px;border-bottom:1px solid #e5e7eb}th{background:#f8fafc;font-weight:600}
+  .expl{font-size:12px;line-height:1.8;white-space:pre-line;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px}
+  .footer{margin-top:28px;font-size:10px;color:#aaa;border-top:1px solid #e5e7eb;padding-top:12px}</style></head><body>
+  <h1>🧠 StrokeAI — Analysis Report</h1>
+  <p class="sub">Generated: ${date} · TFLite Xception 128×128 · Binary sigmoid</p>
+  <div class="v">${isS?'⚠️ Stroke Detected':'✅ Normal'}</div>
+  <p style="font-size:13px;color:#555">${files.length} scan(s) · Majority-vote aggregation</p>
+  <h2>Individual Scan Results</h2>
+  <table><thead><tr><th>#</th><th>Filename</th><th>Prediction</th><th>Confidence</th></tr></thead><tbody>${rows}</tbody></table>
+  <h2>AI Clinical Explanation</h2><div class="expl">${expl}</div>
+  <div class="footer">StrokeAI v3 · Research only · Not a medical diagnosis</div></body></html>`;
+  const w=window.open('','_blank');
+  if(!w){alert('Allow pop-ups for PDF.');return;}
+  w.document.write(html);w.document.close();w.onload=()=>{w.focus();w.print();};
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────
+function resetAll() {
+  urlCache.forEach(u=>URL.revokeObjectURL(u)); urlCache.clear(); files=[]; hmStates={};
+  document.getElementById('thumbs').innerHTML='';
+  document.getElementById('thumbs').style.display='none';
+  document.getElementById('action-row').style.display='none';
+  document.getElementById('cpill').style.display='none';
+  document.getElementById('loading').style.display='none';
+  document.getElementById('results').style.display='none';
+  document.getElementById('how').classList.remove('hidden');
+  document.getElementById('hero').style.display='block';
+  document.getElementById('scan-grid').innerHTML='';
+  clearErr();
+}
+</script>
+</body>
+</html>
